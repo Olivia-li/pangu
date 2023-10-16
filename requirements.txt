@@ -1,0 +1,20 @@
+certifi==2023.7.22
+charset-normalizer==3.2.0
+filelock==3.12.4
+idna==3.4
+Jinja2==3.1.2
+MarkupSafe==2.1.3
+mpmath==1.3.0
+networkx==3.1
+numpy==1.26.0
+onnx==1.14.1
+onnx2pytorch==0.4.1
+perlin-numpy @ git+https://github.com/pvigier/perlin-numpy@5e26837db14042e51166eb6cad4c0df2c1907016
+Pillow==10.0.1
+protobuf==4.24.3
+requests==2.31.0
+sympy==1.12
+torch==2.0.1
+torchvision==0.15.2
+typing_extensions==4.8.0
+urllib3==2.0.5
