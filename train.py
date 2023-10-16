@@ -3,76 +3,11 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
-# from Your_Data_Code import LoadData, LoadConstantMask, LoadStatic
+from utils import roll3D, pad3D, pad2D, Crop3D, Crop2D, gen_mask, ConstructTensor, TruncatedNormalInit, RangeTensor
 from perlin_numpy import generate_fractal_noise_3d
 import torch.onnx
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-def roll3D(x, shift):
-    """
-    Shifts the elements of a 3D tensor along each dimension by the values specified in `shift`.
-    """
-    return torch.roll(x, shifts=shift, dims=(2, 3, 4))
-
-def pad3D(x, pad=(1, 1, 1, 1, 1, 1)):
-    """
-    Pads a 3D tensor along each dimension by the values specified in `pad`.
-    """
-    return F.pad(x, pad)
-
-def pad2D(x, pad=(1, 1, 1, 1)):
-    """
-    Pads a 2D tensor along each dimension by the values specified in `pad`.
-    """
-    return F.pad(x, pad)
-
-def Crop3D(x, size):
-    """
-    Crops a 3D tensor to the specified `size`.
-    """
-    Z, H, W = size
-    return x[:, :Z, :H, :W, :]
-
-def Crop2D(x, size):
-    """
-    Crops a 2D tensor to the specified `size`.
-    """
-    H, W = size
-    return x[:, :H, :W]
-
-def gen_mask(x):
-    """
-    Generates a mask for a 3D tensor where two pixels are considered adjacent if they are next to each other in any dimension.
-    Non-adjacent elements are marked with -1000.
-    """
-    mask = torch.zeros_like(x)
-    mask[:-1, :, :] = mask[:-1, :, :] + (x[1:, :, :] != x[:-1, :, :]).float() * -1000
-    mask[1:, :, :] = mask[1:, :, :] + (x[:-1, :, :] != x[1:, :, :]).float() * -1000
-    mask[:, :-1, :] = mask[:, :-1, :] + (x[:, 1:, :] != x[:, :-1, :]).float() * -1000
-    mask[:, 1:, :] = mask[:, 1:, :] + (x[:, :-1, :] != x[:, 1:, :]).float() * -1000
-    mask[:, :, :-1] = mask[:, :, :-1] + (x[:, :, 1:] != x[:, :, :-1]).float() * -1000
-    mask[:, :, 1:] = mask[:, :, 1:] + (x[:, :, :-1] != x[:, :, 1:]).float() * -1000
-    return mask
-
-def ConstructTensor(shape, device='cpu', dtype=torch.float32):
-    """
-    Creates a new tensor with the specified shape.
-    """
-    return torch.empty(shape, device=device, dtype=dtype)
-
-def TruncatedNormalInit(tensor, mean=0., std=0.02):
-    """
-    Initializes a tensor with values from a truncated normal distribution.
-    """
-    with torch.no_grad():
-        tensor.fill_(torch.fmod(torch.randn(tensor.shape), 2) * std + mean)
-
-def RangeTensor(start, end, device='cpu', dtype=torch.float32):
-    """
-    Creates a new tensor with values in the range [start, end).
-    """
-    return torch.arange(start, end, device=device, dtype=dtype)
 
 class DropPath(nn.Module):
     def __init__(self, drop_prob=None):
@@ -112,25 +47,27 @@ def Inference(input_path, input_surface_path, forecast_range):
             output_list.append((output, output_surface))
     return output_list
 
-def Train():
-    model = PanguModel()
-    model = model.to(device)
-    optimizer = optim.Adam(model.parameters(), lr=5e-4, weight_decay=3e-6)
-    criterion = nn.L1Loss()
+# Don't need to train the model. This is just an example of how to train the model
 
-    epochs = 100
-    for epoch in range(epochs):
-        for step in range(dataset_length):
-            input, input_surface, target, target_surface = LoadData(step)
-            input, input_surface, target, target_surface = input.to(device), input_surface.to(device), target.to(device), target_surface.to(device)
+# def Train():
+#     model = PanguModel()
+#     model = model.to(device)
+#     optimizer = optim.Adam(model.parameters(), lr=5e-4, weight_decay=3e-6)
+#     criterion = nn.L1Loss()
 
-            optimizer.zero_grad()
-            output, output_surface = model(input, input_surface)
-            loss = criterion(output, target) + 0.25 * criterion(output_surface, target_surface)
-            loss.backward()
-            optimizer.step()
+#     epochs = 100
+#     for epoch in range(epochs):
+#         for step in range(dataset_length):
+#             input, input_surface, target, target_surface = LoadData(step)
+#             input, input_surface, target, target_surface = input.to(device), input_surface.to(device), target.to(device), target_surface.to(device)
 
-    torch.save(model.state_dict(), 'models/model.pth')
+#             optimizer.zero_grad()
+#             output, output_surface = model(input, input_surface)
+#             loss = criterion(output, target) + 0.25 * criterion(output_surface, target_surface)
+#             loss.backward()
+#             optimizer.step()
+
+#     torch.save(model.state_dict(), 'models/model.pth')
 
 class PanguModel(nn.Module):
     def __init__(self, onnx_file_path=None):
@@ -399,25 +336,6 @@ class MLP(nn.Module):
         x = self.linear2(x)
         x = self.drop(x)
         return x
-
-    def PerlinNoise():
-        '''Generate random Perlin noise: we follow https://github.com/pvigier/perlin-numpy/ to calculate the perlin noise.'''
-        # Define number of noise
-        octaves = 3
-        # Define the scaling factor of noise
-        noise_scale = 0.2
-        # Define the number of periods of noise along the axis
-        period_number = 12
-        # The size of an input slice
-        H, W = 721, 1440
-        # Scaling factor between two octaves
-        persistence = 0.5
-        # see https://github.com/pvigier/perlin-numpy/ for the implementation of GenerateFractalNoise (e.g., from perlin_numpy import generate_fractal_noise_3d)
-        perlin_noise = noise_scale*generate_fractal_noise_3d((H, W), (period_number, period_number), octaves, persistence)
-        return perlin_noise
-
-
-
 
 
 def PerlinNoise():
