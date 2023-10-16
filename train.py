@@ -6,6 +6,7 @@ from torch.nn.parameter import Parameter
 from utils import roll3D, pad3D, pad2D, Crop3D, Crop2D, gen_mask, ConstructTensor, TruncatedNormalInit, RangeTensor
 from perlin_numpy import generate_fractal_noise_3d
 import torch.onnx
+import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
