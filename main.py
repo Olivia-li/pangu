@@ -1,32 +1,20 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import onnx
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 from utils import roll3D, pad3D, pad2D, Crop3D, Crop2D, gen_mask, ConstructTensor, TruncatedNormalInit, RangeTensor
+from data import LoadData, LoadConstantMask
+from timm.models.layers import DropPath
 from perlin_numpy import generate_fractal_noise_3d
 import torch.onnx
 import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class DropPath(nn.Module):
-    def __init__(self, drop_prob=None):
-        super(DropPath, self).__init__()
-        self.drop_prob = drop_prob
-
-    def forward(self, x):
-        if self.drop_prob is None or self.drop_prob == 0.:
-            return x
-        keep_prob = 1. - self.drop_prob
-        mask = torch.empty((x.size(0), 1, 1, 1), dtype=x.dtype, device=x.device).uniform_(0, 1) < keep_prob
-        return x / keep_prob * mask
-
-    def extra_repr(self):
-        return 'drop_prob={}'.format(self.drop_prob)
-
 def Inference(input_path, input_surface_path, forecast_range):
-    model24 = PanguModel('models/model_1.pth')
+    model24 = PanguModel('models/model_1.onnx')
     model24 = model24.to(device)
     # Similarly load other models
 
@@ -89,7 +77,7 @@ class PanguModel(nn.Module):
         self.downsample = DownSample(192)
 
         # Patch Recovery layer/
-        self._output_layer = PatchRecovery(384)
+        self._output_layer = PatchRecovery(384, (2, 4, 4))
 
         # if onnx_file_path is not None:
         #     onnx_model = onnx.load(onnx_file_path)
@@ -123,7 +111,7 @@ class PatchEmbedding(nn.Module):
         self.conv_surface = nn.Conv2d(in_channels=7, out_channels=dim, kernel_size=patch_size[1:], stride=patch_size[1:])
 
         # Load constant masks from the disc
-        self.land_mask, self.soil_type, self.topography = LoadConstantMask()
+        # self.land_mask, self.soil_type, self.topography = LoadConstantMask()
         
     def forward(self, input, input_surface):
         # Zero-pad the input
@@ -212,7 +200,7 @@ class EarthSpecificLayer(nn.Module):
 
         # Construct basic blocks
         for i in range(depth):
-            self.blocks.append(EarthSpecificBlock(dim, drop_path_ratio_list[i], heads))
+            self.blocks.append(EarthSpecificBlock(dim, drop_path_ratio_list, heads))
           
     def forward(self, x, Z, H, W):
         for i in range(self.depth):
@@ -227,7 +215,7 @@ class EarthSpecificBlock(nn.Module):
     def __init__(self, dim, drop_path_ratio, heads):
         super(EarthSpecificBlock, self).__init__()
         self.window_size = (2, 6, 12)
-        self.drop_path = DropPath(drop_rate=drop_path_ratio)  # Assuming DropPath is a custom PyTorch module you've defined elsewhere
+        self.drop_path = DropPath(drop_prob=drop_path_ratio)
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.linear = MLP(dim, 0)  # Assuming MLP is a custom PyTorch module you've defined elsewhere

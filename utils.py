@@ -1,3 +1,5 @@
+import torch 
+
 def roll3D(x, shift):
     """
     Shifts the elements of a 3D tensor along each dimension by the values specified in `shift`.
