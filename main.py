@@ -6,6 +6,7 @@ from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 from utils import roll3D, pad3D, pad2D, Crop3D, Crop2D, gen_mask, ConstructTensor, TruncatedNormalInit, RangeTensor
 from data import LoadData, LoadConstantMask
+from onnx2pytorch import ConvertModel
 from timm.models.layers import DropPath
 from perlin_numpy import generate_fractal_noise_3d
 import torch.onnx
@@ -79,9 +80,17 @@ class PanguModel(nn.Module):
         # Patch Recovery layer/
         self._output_layer = PatchRecovery(384, (2, 4, 4))
 
+        # NOTE: Idk what I'm doing lol this shouldn't be here.
         # if onnx_file_path is not None:
         #     onnx_model = onnx.load(onnx_file_path)
-        #     torch.onnx.import_graph(onnx_model.graph, self)
+        #     pytorch_model = ConvertModel(onnx_model)
+
+        #     # Load the weights from the pytorch model
+        #     self.load_state_dict(pytorch_model.state_dict())
+        #     # Freeze the model
+        #     for param in self.parameters():
+        #         param.requires_grad = False
+
 
     def forward(self, input, input_surface):
         #Backbone
@@ -337,16 +346,9 @@ def PerlinNoise():
     return perlin_noise
 
 def main():
-    # Define the paths to your input data and the forecast range
-    input_path = 'input_data/input.npy'
-    input_surface_path = 'input_data/input_surface.npy'
-    forecast_range = 10  # replace with your actual forecast range
+    # Load the onnx data into PanguModel
+    model = PanguModel('models/model_1.onnx')
 
-    # Call the Inference function
-    output_list = Inference(input_path, input_surface_path, forecast_range)
-
-    # Now output_list contains the output of the model for each forecast step
-    # You can process the output_list as needed
 
 if __name__ == "__main__":
     main()
